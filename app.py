@@ -8,21 +8,38 @@ from eth_account import Account
 
 app = Flask(__name__)
 
-# Setup mit Private Key aus Environment Variable
-PRIVATE_KEY = os.environ.get('PRIVATE_KEY', '1163cee7c45378c47b75f9cb581af8aa8bca275d2dd60dc2b25f50147a48bb82')
+# Setup mit Agent API Wallet (SICHER!)
+# Environment Variables für Railway - MÜSSEN gesetzt sein!
+MAIN_WALLET_ADDRESS = os.environ.get('MAIN_WALLET_ADDRESS')
+AGENT_PRIVATE_KEY = os.environ.get('AGENT_PRIVATE_KEY')
 
-wallet = Account.from_key(PRIVATE_KEY)
+# Prüfen ob Keys gesetzt sind
+if not MAIN_WALLET_ADDRESS or not AGENT_PRIVATE_KEY:
+    print("❌ FEHLER: MAIN_WALLET_ADDRESS oder AGENT_PRIVATE_KEY nicht gesetzt!")
+    print("Railway Environment Variables prüfen!")
+    exit(1)
+
+print(f"🔑 Main Wallet: {MAIN_WALLET_ADDRESS[:6]}...{MAIN_WALLET_ADDRESS[-4:]}")
+print(f"🤖 Agent Wallet wird geladen...")
+
+# Agent Wallet für Trading (kann nur traden, kein Geld abheben!)
+agent_wallet = Account.from_key(AGENT_PRIVATE_KEY)
 exchange = Exchange(
-    wallet=wallet,
+    wallet=agent_wallet,  # Agent zum Signieren
     base_url=constants.MAINNET_API_URL
 )
+
+# Info für Balance (verwendet Haupt-Wallet-Adresse)
 info = Info(constants.MAINNET_API_URL, skip_ws=True)
 
 @app.route('/')
 def health_check():
     return jsonify({
         "status": "running",
-        "message": "Hyperliquid Webhook Server"
+        "message": "Hyperliquid Webhook Server (Secure Agent API)",
+        "main_wallet": MAIN_WALLET_ADDRESS[:6] + "..." + MAIN_WALLET_ADDRESS[-4:],
+        "agent_wallet": agent_wallet.address[:6] + "..." + agent_wallet.address[-4:],
+        "security": "🔒 Sealed Variables Active"
     })
 
 @app.route('/webhook', methods=['POST'])
@@ -36,8 +53,8 @@ def webhook():
         if action not in ['buy', 'sell', 'close']:
             return jsonify({"error": "Invalid action. Use: buy, sell, close"}), 400
         
-        # Alle offenen Orders schließen
-        open_orders = info.open_orders(wallet.address)
+        # Alle offenen Orders schließen (Main Wallet für Abfragen)
+        open_orders = info.open_orders(MAIN_WALLET_ADDRESS)
         if open_orders:
             print(f"🚫 Cancelling {len(open_orders)} open orders...")
             for order in open_orders:
@@ -53,7 +70,7 @@ def webhook():
         return jsonify({"error": str(e)}), 500
 
 def handle_close():
-    user_state = info.user_state(wallet.address)
+    user_state = info.user_state(MAIN_WALLET_ADDRESS)  # Main Wallet für Abfragen
     positions = user_state.get('assetPositions', [])
     
     closed_positions = []
@@ -80,8 +97,8 @@ def handle_close():
     return f"✅ Closed positions: {', '.join(closed_positions)}"
 
 def handle_trade(action):
-    # Balance abrufen
-    user_state = info.user_state(wallet.address)
+    # Balance abrufen (Main Wallet für Abfragen)
+    user_state = info.user_state(MAIN_WALLET_ADDRESS)
     balance = float(user_state['marginSummary']['accountValue'])
     print(f"💰 Account Balance: ${balance}")
     
@@ -120,7 +137,7 @@ def handle_trade(action):
         print(f"🔄 Wechsel zu {direction}: {order_size} ETH Order")
         print(f"   -> Schließt {abs(current_position_size)} ETH + öffnet {target_size} ETH {direction}")
     
-    # Market Order
+    # Market Order (Agent Wallet signiert)
     result = exchange.market_open("ETH", is_buy, order_size)
     
     print(f"📊 {direction} Order Result: {result}")
