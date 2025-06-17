@@ -108,17 +108,27 @@ def handle_close():
 def handle_trade(action):
     # Balance abrufen (Main Wallet für Abfragen)
     user_state = info.user_state(MAIN_WALLET_ADDRESS)
-    balance = float(user_state['marginSummary']['accountValue'])
-    print(f"💰 Account Balance: ${balance}")
+    margin_summary = user_state['marginSummary']
     
-    # ETH Preis und Size berechnen
+    account_value = float(margin_summary['accountValue'])
+    
+    print(f"💰 Account Value: ${account_value}")
+    print(f"🔍 Komplette User State: {json.dumps(user_state, indent=2)}")
+    
+    # EINFACHE LÖSUNG: Festen Hebel setzen oder aus Environment Variable
+    # Du kannst den Hebel manuell in Railway als Environment Variable setzen
+    leverage = float(os.environ.get('LEVERAGE', '1.0'))  # Default: 1x
+    
+    print(f"🚀 Using Leverage: {leverage}x (set via LEVERAGE env var)")
+    
+    # ETH Preis und Size mit Hebel berechnen
     eth_price = float(info.all_mids()['ETH'])
-    target_size = (balance * 0.98) / eth_price
+    target_size = (account_value * 0.998 * leverage) / eth_price
     target_size = round(target_size, 4)
     
-    if target_size < 0.01:
-        target_size = 0.01
-        print(f"⚠️  Size angepasst auf Minimum: {target_size} ETH")
+    print(f"📊 Target Size (mit {leverage}x Hebel): {target_size} ETH")
+    
+    # KEIN MINIMUM CHECK! Verwende die berechnete Size direkt
     
     # Aktuelle ETH Position checken
     current_position_size = 0
