@@ -113,10 +113,13 @@ def handle_trade(action):
     
     # ETH Preis und Size berechnen
     eth_price = float(info.all_mids()['ETH'])
-    target_size = (balance * 0.998) / eth_price
+    target_size = (balance * 0.98) / eth_price
     target_size = round(target_size, 4)
     
-
+    if target_size < 0.01:
+        target_size = 0.01
+        print(f"⚠️  Size angepasst auf Minimum: {target_size} ETH")
+    
     # Aktuelle ETH Position checken
     current_position_size = 0
     positions = user_state.get('assetPositions', [])
