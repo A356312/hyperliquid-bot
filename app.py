@@ -8,6 +8,15 @@ from eth_account import Account
 
 app = Flask(__name__)
 
+# DEBUG: Environment Variables prüfen
+print("🔍 DEBUG - Alle Environment Variables:")
+for key, value in os.environ.items():
+    if 'WALLET' in key or 'AGENT' in key or 'PRIVATE' in key:
+        print(f"  {key} = {value[:10] if value else 'NONE'}...")
+
+print(f"🔍 MAIN_WALLET_ADDRESS = {os.environ.get('MAIN_WALLET_ADDRESS', 'NICHT GEFUNDEN')}")
+print(f"🔍 AGENT_PRIVATE_KEY = {os.environ.get('AGENT_PRIVATE_KEY', 'NICHT GEFUNDEN')}")
+
 # Setup mit Agent API Wallet (SICHER!)
 # Environment Variables für Railway - MÜSSEN gesetzt sein!
 MAIN_WALLET_ADDRESS = os.environ.get('MAIN_WALLET_ADDRESS')
