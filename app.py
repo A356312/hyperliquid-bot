@@ -16,11 +16,13 @@ for key, value in os.environ.items():
 
 print(f"🔍 MAIN_WALLET_ADDRESS = {os.environ.get('MAIN_WALLET_ADDRESS', 'NICHT GEFUNDEN')}")
 print(f"🔍 AGENT_PRIVATE_KEY = {os.environ.get('AGENT_PRIVATE_KEY', 'NICHT GEFUNDEN')}")
+print(f"🔍 WEBHOOK_PASSWORD = {os.environ.get('WEBHOOK_PASSWORD', 'NICHT GEFUNDEN')}")
 
 # Setup mit Agent API Wallet (SICHER!)
 # Environment Variables für Railway - MÜSSEN gesetzt sein!
 MAIN_WALLET_ADDRESS = os.environ.get('MAIN_WALLET_ADDRESS')
 AGENT_PRIVATE_KEY = os.environ.get('AGENT_PRIVATE_KEY')
+WEBHOOK_PASSWORD = os.environ.get('WEBHOOK_PASSWORD')  # 🔐 NEU: Passwort-Schutz
 
 # Prüfen ob Keys gesetzt sind
 if not MAIN_WALLET_ADDRESS or not AGENT_PRIVATE_KEY:
@@ -28,8 +30,14 @@ if not MAIN_WALLET_ADDRESS or not AGENT_PRIVATE_KEY:
     print("Railway Environment Variables prüfen!")
     exit(1)
 
+if not WEBHOOK_PASSWORD:
+    print("❌ FEHLER: WEBHOOK_PASSWORD nicht gesetzt!")
+    print("Setze Environment Variable: WEBHOOK_PASSWORD=dein_sicheres_passwort")
+    exit(1)
+
 print(f"🔑 Main Wallet: {MAIN_WALLET_ADDRESS[:6]}...{MAIN_WALLET_ADDRESS[-4:]}")
 print(f"🤖 Agent Wallet wird geladen...")
+print(f"🔐 Webhook Passwort: {'*' * len(WEBHOOK_PASSWORD)}")
 
 # Agent Wallet für Trading (kann nur traden, kein Geld abheben!)
 agent_wallet = Account.from_key(AGENT_PRIVATE_KEY)
@@ -48,13 +56,23 @@ def health_check():
         "message": "Hyperliquid Webhook Server (Secure Agent API)",
         "main_wallet": MAIN_WALLET_ADDRESS[:6] + "..." + MAIN_WALLET_ADDRESS[-4:],
         "agent_wallet": agent_wallet.address[:6] + "..." + agent_wallet.address[-4:],
-        "security": "🔒 Sealed Variables Active"
+        "security": "🔒 Password Protection Active"
     })
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     try:
         data = request.get_json()
+        
+        # 🔐 PASSWORT-CHECK ZUERST!
+        provided_password = data.get('password', '')
+        if provided_password != WEBHOOK_PASSWORD:
+            print(f"❌ UNAUTHORIZED: Falsches Passwort! Bereitgestellt: '{provided_password}'")
+            return jsonify({
+                "error": "Unauthorized: Invalid password",
+                "status": "denied"
+            }), 401
+        
         action = data.get('action', '').lower()
         
         print(f"📨 Webhook received: {data}")
